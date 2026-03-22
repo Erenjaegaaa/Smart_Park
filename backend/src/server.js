@@ -1,10 +1,17 @@
 import express from 'express'
+import cors from 'cors' // <-- Import CORS
 import 'dotenv/config'
 import authRoutes from './routes/authRoutes.js'
 import bookingRoutes from './routes/bookingRoutes.js'
 import slotRoutes from './routes/slotRoutes.js'
 
 const app = express()
+
+// Allow frontend to talk to backend
+app.use(cors({
+  origin: ['http://localhost:5173', 'http://localhost:3000'],
+  credentials: true
+}))
 
 app.use(express.json())
 
