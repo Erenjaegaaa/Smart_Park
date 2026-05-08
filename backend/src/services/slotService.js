@@ -4,7 +4,7 @@ export const updateSlot = async (slotId, isOccupied) => {
   const { data, error } = await supabase
     .from('parking_slots')
     .update({
-      status: isOccupied,
+      status: isOccupied ? 'occupied' : 'available',
       updated_at: new Date().toISOString()
     })
     .eq('slot_id', slotId)

@@ -77,11 +77,9 @@ function BookingModal({ slot, location, onClose, onBooked }) {
     setError('')
 
     try {
-      // Keep as local time string — no UTC conversion
       const startDateTime = `${form.startDate}T${form.startTime}:00`
       const endDateTime = `${form.endDate}T${form.endTime}:00`
 
-      // Step 1 — create the booking in DB
       const bookingRes = await createBooking({
         slot_id: slot.id,
         start_time: startDateTime,
@@ -93,7 +91,6 @@ function BookingModal({ slot, location, onClose, onBooked }) {
         bookingRes.data?.booking?.id ||
         bookingRes.data?.id
 
-      // Step 2 — process payment
       await payForBooking(newBookingId)
 
       setBookingId(newBookingId)
@@ -287,7 +284,7 @@ export default function BookingPage() {
           const mapped = data.map((s) => ({
             id: s.slot_id,
             slotNumber: `P${s.slot_id}`,
-            status: s.status === false ? 'occupied' : 'available',
+            status: s.status === 'occupied' ? 'occupied' : s.status === 'booked' ? 'booked' : 'available',
           }))
           setSlots(mapped)
         } else {
@@ -329,6 +326,22 @@ export default function BookingPage() {
       <h1 className="font-['Inter_Tight'] text-5xl font-extrabold mb-10">
         {selectedLocation.name} Parking
       </h1>
+
+      {/* Legend */}
+      <div className="flex gap-6 mb-8">
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-green-500" />
+          <span className="font-['JetBrains_Mono'] text-xs uppercase tracking-wider text-[#737373]">Available</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-yellow-400" />
+          <span className="font-['JetBrains_Mono'] text-xs uppercase tracking-wider text-[#737373]">Booked</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-red-500" />
+          <span className="font-['JetBrains_Mono'] text-xs uppercase tracking-wider text-[#737373]">Occupied</span>
+        </div>
+      </div>
 
       <div className="grid grid-cols-4 gap-4">
         {slots.map((slot) => {
