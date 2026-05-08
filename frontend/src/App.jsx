@@ -7,6 +7,7 @@ import ProfilePage from './pages/ProfilePage'
 import AuthCallbackPage from './pages/AuthCallbackPage'
 import CompleteProfilePage from './pages/CompleteProfilePage'
 import ProtectedRoute from './components/ProtectedRoute'
+import BookingPage from './pages/BookingPage'
 
 function App() {
   return (
@@ -30,6 +31,11 @@ function App() {
         <Route path="/profile" element={
           <ProtectedRoute>
             <ProfilePage />
+          </ProtectedRoute>
+        } />
+        <Route path="/booking" element={
+          <ProtectedRoute>
+            <BookingPage />
           </ProtectedRoute>
         } />
 

@@ -10,7 +10,11 @@ export const createBooking = async (userId, slotId, startTime, endTime) => {
     })
 
   if (error) throw new Error(error.message)
-  return data
+  
+  // RPC returns array, get first element
+  const booking = Array.isArray(data) ? data[0] : data
+  if (!booking) throw new Error('Booking creation failed')
+  return booking
 }
 
 export const getUserBookings = async (userId) => {

@@ -14,8 +14,8 @@ export const createBooking = async (req, res) => {
       return res.status(400).json({ error: 'slot_id must be a number' })
     }
 
-    const start = new Date(start_time)
-    const end = new Date(end_time)
+    const start = new Date(start_time + '+05:30')
+    const end = new Date(end_time + '+05:30')
 
     if (isNaN(start) || isNaN(end)) {
       return res.status(400).json({ error: 'Invalid date format' })
@@ -23,7 +23,9 @@ export const createBooking = async (req, res) => {
     if (start >= end) {
       return res.status(400).json({ error: 'end_time must be after start_time' })
     }
-    if (start < new Date()) {
+
+    const nowMinus5Min = new Date(Date.now() - 5 * 60 * 1000)
+    if (start < nowMinus5Min) {
       return res.status(400).json({ error: 'start_time cannot be in the past' })
     }
 
