@@ -41,6 +41,7 @@ const STATUS_UI = {
 function BookingModal({ slot, location, onClose, onBooked }) {
   const [step, setStep] = useState(1)
   const [bookingId, setBookingId] = useState('')
+  const [billData, setBillData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -59,20 +60,8 @@ function BookingModal({ slot, location, onClose, onBooked }) {
 
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }))
 
-  const calcDuration = () => {
-    if (!form.startTime || !form.endTime) return 0
-    const [sh, sm] = form.startTime.split(':').map(Number)
-    const [eh, em] = form.endTime.split(':').map(Number)
-    return Math.max(0, (eh * 60 + em - (sh * 60 + sm)) / 60)
-  }
-
-  const duration = calcDuration()
-  const parking = duration * 40
-  const platform = duration > 0 ? 10 : 0
-  const gst = +((parking + platform) * 0.18).toFixed(2)
-  const total = +(parking + platform + gst).toFixed(2)
-
-  const handlePayment = async () => {
+  // Step 1 — create booking, get real breakdown from backend
+  const handleCreateBooking = async () => {
     setLoading(true)
     setError('')
 
@@ -86,14 +75,29 @@ function BookingModal({ slot, location, onClose, onBooked }) {
         end_time: endDateTime,
       })
 
-      const newBookingId =
-        bookingRes.data?.booking?.booking_id ||
-        bookingRes.data?.booking?.id ||
-        bookingRes.data?.id
+      const booking = bookingRes.data?.booking
+      const breakdown = bookingRes.data?.breakdown
 
-      await payForBooking(newBookingId)
+      const newBookingId = booking?.booking_id || booking?.id
+      if (!newBookingId) throw new Error('Booking creation failed')
 
       setBookingId(newBookingId)
+      setBillData(breakdown)
+      setStep(2)
+    } catch (err) {
+      setError(err?.response?.data?.error || 'Failed to create booking. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Step 3 — just process payment, amount already locked in DB
+  const handlePayment = async () => {
+    setLoading(true)
+    setError('')
+
+    try {
+      await payForBooking(bookingId)
       setStep(4)
     } catch (err) {
       setError(err?.response?.data?.error || 'Payment failed. Please try again.')
@@ -143,12 +147,16 @@ function BookingModal({ slot, location, onClose, onBooked }) {
               />
             </div>
 
+            {error && (
+              <p className="text-red-500 text-sm">{error}</p>
+            )}
+
             <button
-              onClick={() => setStep(2)}
-              disabled={!form.startTime || !form.endTime}
+              onClick={handleCreateBooking}
+              disabled={!form.startTime || !form.endTime || loading}
               className="w-full bg-[#FF3D00] py-3 font-bold disabled:opacity-40"
             >
-              Continue
+              {loading ? 'Creating Booking...' : 'Continue'}
             </button>
           </div>
         )}
@@ -206,11 +214,21 @@ function BookingModal({ slot, location, onClose, onBooked }) {
             </h2>
 
             <div className="border border-[#262626] bg-[#0A0A0A] p-6 space-y-3">
-              <div className="flex justify-between"><span>Parking</span><span>₹{parking}</span></div>
-              <div className="flex justify-between"><span>Platform</span><span>₹{platform}</span></div>
-              <div className="flex justify-between"><span>GST</span><span>₹{gst}</span></div>
+              <div className="flex justify-between">
+                <span>Parking</span>
+                <span>₹{billData?.parking ?? '—'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Platform</span>
+                <span>₹{billData?.platform ?? '—'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>GST (18%)</span>
+                <span>₹{billData?.gst ?? '—'}</span>
+              </div>
               <div className="flex justify-between font-bold text-[#FF3D00]">
-                <span>Total</span><span>₹{total}</span>
+                <span>Total</span>
+                <span>₹{billData?.total ?? '—'}</span>
               </div>
             </div>
 
@@ -239,7 +257,7 @@ function BookingModal({ slot, location, onClose, onBooked }) {
               <p>Booking ID: {bookingId}</p>
               <p>Location: {location.name}</p>
               <p>Slot: {slot.slotNumber}</p>
-              <p>Total Paid: ₹{total}</p>
+              <p>Total Paid: ₹{billData?.total}</p>
             </div>
 
             <button
@@ -327,7 +345,6 @@ export default function BookingPage() {
         {selectedLocation.name} Parking
       </h1>
 
-      {/* Legend */}
       <div className="flex gap-6 mb-8">
         <div className="flex items-center gap-2">
           <span className="w-3 h-3 rounded-full bg-green-500" />
@@ -346,7 +363,6 @@ export default function BookingPage() {
       <div className="grid grid-cols-4 gap-4">
         {slots.map((slot) => {
           const ui = STATUS_UI[slot.status]
-
           return (
             <button
               key={slot.id}
@@ -354,9 +370,7 @@ export default function BookingPage() {
               onClick={() => !ui.disabled && setSelectedSlot(slot)}
               className={`relative border border-[#262626] p-8 text-center transition-all ${ui.bg} ${ui.text} ${ui.border}`}
             >
-              <span
-                className={`absolute top-2 right-2 w-3 h-3 rounded-full ${ui.dot}`}
-              />
+              <span className={`absolute top-2 right-2 w-3 h-3 rounded-full ${ui.dot}`} />
               {slot.slotNumber}
             </button>
           )

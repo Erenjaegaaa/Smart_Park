@@ -29,12 +29,26 @@ export const createBooking = async (req, res) => {
       return res.status(400).json({ error: 'start_time cannot be in the past' })
     }
 
+    // Calculate amount server-side
+    const durationHours = (end - start) / (1000 * 60 * 60)
+    const parking = +(durationHours * 40).toFixed(2)
+    const platform = 10
+    const gst = +((parking + platform) * 0.18).toFixed(2)
+    const amount = +(parking + platform + gst).toFixed(2)
+
     const data = await bookingService.createBooking(
-      req.user.id, slotIdInt, start.toISOString(), end.toISOString()
+      req.user.id, slotIdInt, start.toISOString(), end.toISOString(), amount
     )
+
     res.status(201).json({
       message: 'Booking created successfully',
-      booking: data
+      booking: data,
+      breakdown: {
+        parking,
+        platform,
+        gst,
+        total: amount,
+      }
     })
   } catch (err) {
     res.status(400).json({ error: err.message })

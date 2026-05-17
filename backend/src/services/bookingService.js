@@ -1,12 +1,13 @@
 import supabase from '../config/supabaseClient.js'
 
-export const createBooking = async (userId, slotId, startTime, endTime) => {
+export const createBooking = async (userId, slotId, startTime, endTime, amount) => {
   const { data, error } = await supabase
     .rpc('create_booking_safe', {
       p_user_id: userId,
       p_slot_id: slotId,
       p_start_time: startTime,
-      p_end_time: endTime
+      p_end_time: endTime,
+      p_amount: amount
     })
 
   if (error) throw new Error(error.message)
