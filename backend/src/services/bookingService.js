@@ -15,6 +15,13 @@ export const createBooking = async (userId, slotId, startTime, endTime, amount) 
   // RPC returns array, get first element
   const booking = Array.isArray(data) ? data[0] : data
   if (!booking) throw new Error('Booking creation failed')
+
+  // Mark slot as booked
+  await supabase
+    .from('parking_slots')
+    .update({ status: 'booked' })
+    .eq('slot_id', slotId)
+
   return booking
 }
 
@@ -52,6 +59,15 @@ export const cancelBooking = async (bookingId, userId) => {
     .single()
 
   if (error) throw error
+
+  // Mark slot as available again
+  if (booking && booking.slot_id) {
+    await supabase
+      .from('parking_slots')
+      .update({ status: 'available' })
+      .eq('slot_id', booking.slot_id)
+  }
+
   return data
 }
 
