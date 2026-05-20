@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import useBookingStore from '../store/bookingStore'
-import { getAllSlots, createBooking, payForBooking } from '../services/bookingService'
+import { getAllSlots, createBooking, payForBooking, cancelBooking } from '../services/bookingService'
 
 const generateSlots = (locationId, total) =>
   Array.from({ length: total }, (_, i) => {
@@ -60,11 +60,37 @@ function BookingModal({ slot, location, onClose, onBooked }) {
 
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }))
 
-  // Step 1 — create booking, get real breakdown from backend
+  const silentCancel = async () => {
+    if (!bookingId) return
+    try {
+      await cancelBooking(bookingId)
+    } catch (_) {}
+  }
+
+  const handleClose = async () => {
+    if (step === 2 || step === 3) {
+      await silentCancel()
+    }
+    onClose()
+  }
+
+  const handleBack = async () => {
+    setError('')
+    if (step === 1) {
+      onClose()
+    } else if (step === 2) {
+      await silentCancel()
+      setBookingId('')
+      setBillData(null)
+      setStep(1)
+    } else if (step === 3) {
+      setStep(2)
+    }
+  }
+
   const handleCreateBooking = async () => {
     setLoading(true)
     setError('')
-
     try {
       const startDateTime = `${form.startDate}T${form.startTime}:00`
       const endDateTime = `${form.endDate}T${form.endTime}:00`
@@ -91,11 +117,9 @@ function BookingModal({ slot, location, onClose, onBooked }) {
     }
   }
 
-  // Step 3 — just process payment, amount already locked in DB
   const handlePayment = async () => {
     setLoading(true)
     setError('')
-
     try {
       await payForBooking(bookingId)
       setStep(4)
@@ -108,8 +132,31 @@ function BookingModal({ slot, location, onClose, onBooked }) {
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-      <div className="w-full max-w-lg bg-[#0F0F0F] border border-[#262626] p-8">
-        <p className="font-['JetBrains_Mono'] uppercase tracking-widest text-xs text-[#FF3D00] mb-6">
+      <div className="w-full max-w-lg bg-[#0F0F0F] border border-[#262626] p-8 relative">
+
+        {/* Cross button — top right, hidden on step 4 */}
+        {step !== 4 && (
+          <button
+            onClick={handleClose}
+            disabled={loading}
+            className="absolute top-4 right-4 text-[#737373] hover:text-[#FF3D00] text-lg transition-colors disabled:opacity-40 font-['JetBrains_Mono']"
+          >
+            ✕
+          </button>
+        )}
+
+        {/* Back button — hidden on step 4 */}
+        {step !== 4 && (
+          <button
+            onClick={handleBack}
+            disabled={loading}
+            className="flex items-center gap-2 text-[#737373] hover:text-[#FAFAFA] text-xs font-['JetBrains_Mono'] uppercase tracking-widest mb-6 transition-colors disabled:opacity-40"
+          >
+            ← Back
+          </button>
+        )}
+
+        <p className="font-['JetBrains_Mono'] uppercase tracking-widest text-xs text-[#FF3D00] mb-4">
           Slot {slot.slotNumber}
         </p>
 
@@ -147,9 +194,7 @@ function BookingModal({ slot, location, onClose, onBooked }) {
               />
             </div>
 
-            {error && (
-              <p className="text-red-500 text-sm">{error}</p>
-            )}
+            {error && <p className="text-red-500 text-sm">{error}</p>}
 
             <button
               onClick={handleCreateBooking}
@@ -232,9 +277,7 @@ function BookingModal({ slot, location, onClose, onBooked }) {
               </div>
             </div>
 
-            {error && (
-              <p className="text-red-500 text-sm mt-3">{error}</p>
-            )}
+            {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
 
             <button
               onClick={handlePayment}
@@ -368,7 +411,10 @@ export default function BookingPage() {
               key={slot.id}
               disabled={ui.disabled}
               onClick={() => !ui.disabled && setSelectedSlot(slot)}
-              className={`relative border border-[#262626] p-8 text-center transition-all ${ui.bg} ${ui.text} ${ui.border}`}
+              className={`relative border border-[#262626] p-8 text-center transition-all duration-200
+                ${ui.bg} ${ui.text} ${ui.border}
+                ${!ui.disabled ? 'hover:scale-105 hover:shadow-[0_0_15px_rgba(255,61,0,0.3)]' : ''}
+              `}
             >
               <span className={`absolute top-2 right-2 w-3 h-3 rounded-full ${ui.dot}`} />
               {slot.slotNumber}
