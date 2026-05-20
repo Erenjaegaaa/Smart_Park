@@ -13,11 +13,12 @@ class apiclient:
                 "slot_id": int(slot_id),
                 "status": is_occupied
             }
-            requests.post(
+            print(f"[API] Sending to {self.url}: {payload}")
+            response = requests.post(
                 self.url,
                 json=payload,
-                timeout=3
+                timeout=5
             )
-            print(f"[API] Slot {slot_id} update sent")
+            print(f"[API] Slot {slot_id} update sent - Response: {response.status_code}")
         except Exception as e:
             print("[API] Failed to send update: ", e)

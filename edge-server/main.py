@@ -1,12 +1,16 @@
 import cv2
 import json
 import os
+import sys
 
 from video.video_source import get_video_capture
 from detection.detector import detect_vehicles
 from slots.slot_logic import check_slots
 from slots.slot_state_manager import slotstatemanager
 from services.api_client import apiclient
+
+# Check if ESP32 mode is enabled via command line argument
+USE_ESP32 = len(sys.argv) > 1 and sys.argv[1].lower() == "esp32"
 
 api_client = apiclient("config/slot_status.json")
 
@@ -16,15 +20,25 @@ slots_path = os.path.join(base_dir, "config", "slots.json")
 
 with open(slots_path, "r") as f:
     slots = json.load(f)
+
 # INIT STATE MANAGER
 state_manager = slotstatemanager(base_dir)
 
-cap = get_video_capture()   
+# Force initial API update with slot states
+print("[MAIN] Sending initial slot states...")
+initial_occupied = [False] * len(slots)
+for i, slot_id in enumerate(range(1, len(slots) + 1)):
+    api_client.send_update(slot_id, initial_occupied[i])
+
+print(f"Starting with {'ESP32 stream' if USE_ESP32 else 'local video'}...")
+cap = get_video_capture(use_esp32=USE_ESP32)   
 
 while True:
     ret, frame = cap.read()
     if not ret:
-        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+        # Only reset for VideoCapture (local video), not ESP32Stream (continuous stream)
+        if hasattr(cap, 'set'):
+            cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
         continue
 
     car_boxes = detect_vehicles(frame)

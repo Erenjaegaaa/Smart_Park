@@ -2,6 +2,7 @@
 import cv2
 import json
 import os
+import sys
 import requests
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -15,7 +16,7 @@ slots = []
 points = []
 
 def send_slots_to_backend(slots):
-
+    """Send detected slots to backend API."""
     payload = {"slots": []}
 
     for i, slot in enumerate(slots):
@@ -36,6 +37,42 @@ def send_slots_to_backend(slots):
         print(response.text)
     except Exception as e:
         print(f"Could not reach backend ({e}). Slots saved locally only.")
+
+
+def get_initial_frame(use_esp32=False):
+    """Get initial frame from video source."""
+    if use_esp32:
+        # Import ESP32Stream from fetch.py
+        parent_dir = os.path.dirname(BASE_DIR)
+        sys.path.insert(0, parent_dir)
+        from fetch import ESP32Stream
+        cap = ESP32Stream()
+        
+        print("Waiting for ESP32 stream...")
+        for _ in range(50):  # Wait up to 5 seconds
+            ret, frame = cap.read()
+            if ret:
+                cap.release()
+                return frame
+            cv2.waitKey(100)
+        
+        raise RuntimeError("Could not get frame from ESP32 stream")
+    else:
+        cap = cv2.VideoCapture(VIDEO_PATH)
+
+        if not cap.isOpened():
+            print("ERROR: Could not open video file.")
+            exit()
+
+        ret, frame = cap.read()
+
+        if not ret or frame is None:
+            print("ERROR: Could not read frame from video.")
+            exit()
+
+        cap.release()
+        return frame
+
 
 def mouse_callback(event, x, y, flags, param):
     global points, slots
@@ -60,51 +97,41 @@ def mouse_callback(event, x, y, flags, param):
 
             print(f"Slot added: {slot}")
 
-cap = cv2.VideoCapture(VIDEO_PATH)
 
-if not cap.isOpened():
-    print("ERROR: Could not open video file.")
-    exit()
+if __name__ == "__main__":
+    # Use ESP32 if argument provided, otherwise use local video
+    use_esp32 = len(sys.argv) > 1 and sys.argv[1].lower() == "esp32"
+    
+    frame = get_initial_frame(use_esp32)
 
-ret, frame = cap.read()
+    cv2.namedWindow("Draw Parking Slots")
+    cv2.setMouseCallback("Draw Parking Slots", mouse_callback)
 
-if not ret or frame is None:
-    print("ERROR: Could not read frame from video.")
-    exit()
+    while True:
+        display = frame.copy()
 
-cap.release()
+        # Draw saved slots
+        for slot in slots:
+            cv2.rectangle(
+                display,
+                (slot["x"], slot["y"]),
+                (slot["x"] + slot["w"], slot["y"] + slot["h"]),
+                (255, 0, 0),
+                2
+            )
 
-cv2.namedWindow("Draw Parking Slots")
-cv2.setMouseCallback("Draw Parking Slots", mouse_callback)
+        cv2.imshow("Draw Parking Slots", display)
 
-while True:
-    display = frame.copy()
+        key = cv2.waitKey(1)
 
-    # Draw saved slots
-    for slot in slots:
-        cv2.rectangle(
-            display,
-            (slot["x"], slot["y"]),
-            (slot["x"] + slot["w"], slot["y"] + slot["h"]),
-            (255, 0, 0),
-            2
-        )
+        if key == ord("s"):  # Save
+            with open(OUTPUT_FILE, "w") as f:
+                json.dump(slots, f, indent=4)
+            print(f"Slots saved to {OUTPUT_FILE}")
+            send_slots_to_backend(slots)
+            break
+        elif key == ord("q"):  # Quit
+            print("Exiting without saving.")
+            break
 
-    cv2.imshow("Draw Parking Slots", display)
-
-    key = cv2.waitKey(1)
-
-    if key == ord("s"):  # Save
-        with open(OUTPUT_FILE, "w") as f:
-            json.dump(slots, f, indent=4)
-
-        print("Slots saved.")
-
-        send_slots_to_backend(slots)
-
-        break
-
-    elif key == ord("q"):
-        break
-
-cv2.destroyAllWindows()
+    cv2.destroyAllWindows()

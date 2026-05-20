@@ -1,10 +1,10 @@
 from shapely.geometry import Polygon, Point
 
-OCCUPANCY_THRESHOLD = 0.25
+OCCUPANCY_THRESHOLD = 0.20  # Reduced from 0.25 to detect occupancy more reliably
 
 # Debounce: require N consecutive frames before changing state
 DEBOUNCE_TO_FREE = 5     # frames before occupied -> free
-DEBOUNCE_TO_OCCUPIED = 3  # frames before free -> occupied
+DEBOUNCE_TO_OCCUPIED = 2  # Reduced from 3 to detect occupied faster
 
 
 def bbox_to_polygon(x1, y1, x2, y2):
